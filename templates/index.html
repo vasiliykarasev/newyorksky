@@ -1,22 +1,68 @@
 <html>
 <head>
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.2.0/css/all.css" integrity="sha384-hWVjflwFxL6sNzntih27bfxkr27PmbbK/iSvJ+a4+0owXq79v+lsFkW54bOGbiDQ" crossorigin="anonymous">
-  <link rel="stylesheet" href="static/stylesheet.css">
- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
- <script src="static/ues_sky.js"></script>
-  <script>
-    $(function() { OnPageLoad(); });
-    
-    function OnPageLoad() {
-    }
+<%include file="head.html"/>
 
-  </script>
-</head>
-<body>
-<div class="container">
-  <h1> hello there upper east side </h1>
+<script src="static/ues_sky.js"></script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-24988729-3"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-24988729-3');
+</script>
 
 <script>
+$(function() { OnPageLoad(); });
+
+function OnPageLoad() {
+  $(document).keydown(function(event) {
+    handle_modal_control(event);
+  });
+  $(document).mousedown(function(event) {
+    handle_modal_control(event);
+  });
+}
+</script>
+<meta name="keywords" content="New York City, New York Sky, NYC, New York Skyline">
+<meta name="description" content="Live view of New York City's sky. View from Upper East Side.">
+<title>New York Sky</title>
+
+</head>
+<body>
+
+<%include file="navbar.html" args="current='home'"/>
+
+<script>
+
+function handle_modal_control(event) {
+  if (!modal_shown) {
+    return;
+  }
+  if (event.type == "mousedown") {
+    close_modal();
+  }
+  if (event.type == "keydown") {
+    if (event.key == 'ArrowLeft') {
+      current_image_index = Math.max(0, current_image_index - 1);
+      display_modal(current_image_index);
+    }
+    if (event.key == 'ArrowRight') {
+      current_image_index = Math.min(image_urls.length-1, current_image_index+1);
+      display_modal(current_image_index);
+    }
+    if (event.key == 'Escape') {
+      close_modal();
+    }
+  }
+}
+
+function close_modal() {
+  var modal = $('#modal')[0];
+  modal.style.display = "none";
+  modal_shown = false;
+}
+
 
 function date_from_filename(url) {
   timestamp = Number(url.replace(/^.*[\\\/]/, '').replace('.jpg', ''))
@@ -27,20 +73,42 @@ function pretty_print_date(d) {
   return d.toISOString().slice(0,10) + " " + d.toLocaleTimeString();
 }
 
-function display_modal(img, image_url) {
+function display_thumb(image_index) {
+  thumb_url = thumb_urls[image_index];
+  $('#imgcell'+image_index).attr("src", thumb_url);
+}
+
+function display_modal(image_index) {
+  modal_shown = true;
+  current_image_index = image_index;
+  image_url = image_urls[image_index];
   var image_date = date_from_filename(image_url);
   // Get the modal
   var modal = $('#modal')[0];
   modal.style.display = "block";
   $('#modalimage').attr("src", image_url);
-  $('#modalimage').click(function() { modal.style.display = 'none'; });
+  $('#modalimage').click(function() { close_modal(); });
   $('#modalcaption').text(pretty_print_date(image_date));
 }
+
+var current_image_index = 0;
+var modal_shown = false;
+
 </script>
 <script>
 image_colors = [
 % for image in images:
-[${image['mean_color'][0]}, ${image['mean_color'][1]}, ${image['mean_color'][2]}],
+[${image['sky_color'][0]}, ${image['sky_color'][1]}, ${image['sky_color'][2]}],
+% endfor
+]
+image_urls = [
+% for image in images:
+"${image['url']}",
+% endfor
+]
+thumb_urls = [
+% for image in images:
+"${image['url_thumb']}",
 % endfor
 ]
 </script>
@@ -52,20 +120,16 @@ image_colors = [
 </div>
 
 <div class="grid">
-  % for image in images:
-  <div class="cell" style="background: rgba(${image['mean_color'][0]}, ${image['mean_color'][1]}, ${image['mean_color'][2]}, 10.0);">
-    <img src="${image['url_thumb']}" class="responsive-image" onclick="display_modal($(this), '${image['url']}');">
+  % for index, image in enumerate(images):
+  <div class="cell" style="background: rgba(${image['sky_color'][0]}, ${image['sky_color'][1]}, ${image['sky_color'][2]}, 10.0);" onmouseover="display_thumb(${index});">
+    <img id="imgcell${index}" src="static/dummy.jpg" class="responsive-image" onclick="display_modal(${index});">
+    <!-- <img src="${image['url_thumb']}" class="responsive-image" onclick="display_modal(${index});"> --!>
   </div>
   % endfor
   
 </div>
 
-<div class="footer">
-  <a href="index.html">UESSKY</a> 
-  &bull; <a href="about.html">About</a>
-  &bull; <a href="https://github.com/vasiliykarasev/"><img src="static/github-logo.png" class="icon"></img></a>
-  &bull; Updated on ${update_date}
-</div>
+<%include file="footer.html" args="update_date=update_date"/>
 
 </div>
 </body>

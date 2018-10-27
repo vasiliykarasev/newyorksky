@@ -1,7 +1,11 @@
 @import url('https://fonts.googleapis.com/css?family=Open+Sans');
 @import url('https://fonts.googleapis.com/css?family=Dancing+Script');
 
-
+.navbar {
+  height: 2.5em;
+  background-color: #0b111a!important;
+  border-bottom: 1px solid black;
+}
 body {
   margin: 0;
   padding 0;
@@ -20,6 +24,15 @@ h1 {
   font-weight: 600;
   font-size: 3.5em;
   margin-bottom: 0.1em;
+  margin-top: 0em;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: #cccccc;
+}
+
+.nycsky-text {
+  font-family: "Dancing Script", "Helvetica", "Arial", sans-serif;
+  font-weight: 600;
+  font-size: 1.5em;
   -webkit-text-stroke-width: 1px;
   -webkit-text-stroke-color: #cccccc;
 }
@@ -38,7 +51,7 @@ a:hover {
   -webkit-transition: color .5s ease-in-out;
 }
 
-.container {
+.nycsky-container {
   margin: 0 auto;
   padding-left: 0.5em;
   padding-right: 0.5em;
@@ -79,7 +92,7 @@ a:hover {
   flex: 1 1 calc(10%);
 }
 
-.footer {
+.nycsky-footer {
   position: fixed;
   left: 0;
   bottom: 0.2em;
@@ -129,23 +142,13 @@ a:hover {
     flex-direction: row;
   }
   .cell {
-    width: calc(100% / 2 - 0.2rem);
-  }
-}
-@media screen and (min-width: 900px) {
-  .cell {
-    width: calc(100% / 4 - 0.2rem);
+    width: calc(100% / 20 - 0.2rem);
   }
 }
 
 @media screen and (min-width: 1200px) {
   .cell {
-    width: calc(100% / 16 - 0.2rem);
-  }
-}
-@media screen and (min-width: 1500px) {
-  .cell {
-    width: calc(100% / 16 - 0.2rem);
+    width: calc(100% / 40 - 0.2rem);
   }
 }
 
@@ -181,4 +184,52 @@ a:hover {
   height: 150px;
   font-family: "Dancing Script", "Helvetica", "Arial", sans-serif;
   font-weight: 600;
+}
+
+.videocontainer {
+  max-height: 100px;
+  overflow:hidden;
+  z-index: 0;
+}
+.videooverlay {
+  z-index: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+video {
+  max-width: 100%;
+  width: 100%;
+}
+
+.btn {                                                                          
+  font-weight: 700;                                                             
+  text-transform: uppercase;                                                    
+  border: none;                                                                 
+  border-radius: 300px;                                                         
+  font-family: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;                
+}                                                                               
+                                                                                
+.btn-xl {                                                                       
+  padding: 1rem 2rem;                                                           
+}                                                                               
+                                                                                
+.btn-primary {                                                                  
+  background-color: #F05F40;                                                    
+  border-color: #F05F40;                                                        
+}                                                                               
+                                                                                
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {                   
+  color: #fff;                                                                  
+  background-color: #ee4b28 !important;                                         
+}                                                                               
+                                                                                
+.btn-primary:active, .btn-primary:focus {                                       
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(240, 95, 64, 0.5) !important;           
+  box-shadow: 0 0 0 0.2rem rgba(240, 95, 64, 0.5) !important;                   
+}
+
+.nav-link {
+  margin: 0 1em;
 }

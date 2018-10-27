@@ -1,0 +1,14 @@
+<html>
+<head>
+<%include file="head.html"/>
+</head>
+<body>
+<%include file="navbar.html" args="current='timelapse'"/>
+
+<div class="nycsky-container">
+<video playsinline autoplay controls src="video/timelapse.webm" type="video/webm" loop></video>
+
+<%include file="footer.html" args="update_date=update_date"/>
+</div>
+</body>
+</html>
