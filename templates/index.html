@@ -70,7 +70,7 @@ function date_from_filename(url) {
 }
 
 function pretty_print_date(d) {
-  return d.toISOString().slice(0,10) + " " + d.toLocaleTimeString();
+  return d.toISOString('en-US', { timeZone: 'America/New_York' }).slice(0,10) + " " + d.toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
 }
 
 function display_thumb(image_index) {
@@ -123,7 +123,6 @@ thumb_urls = [
   % for index, image in enumerate(images):
   <div class="cell" style="background: rgba(${image['sky_color'][0]}, ${image['sky_color'][1]}, ${image['sky_color'][2]}, 10.0);" onmouseover="display_thumb(${index});">
     <img id="imgcell${index}" src="static/dummy.jpg" class="responsive-image" onclick="display_modal(${index});">
-    <!-- <img src="${image['url_thumb']}" class="responsive-image" onclick="display_modal(${index});"> --!>
   </div>
   % endfor
   
