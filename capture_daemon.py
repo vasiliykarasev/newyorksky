@@ -17,8 +17,8 @@ class ImageWriter:
         self._cap = cv2.VideoCapture(device_id)
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self._thumb_scale = 0.25
-        self._image_scale = 0.5
+        self._thumb_scale = 0.125
+        self._image_scale = 1.0
 
         log.check(self._cap.isOpened())
 
@@ -31,6 +31,7 @@ class ImageWriter:
             os.mkdir(os.path.join(self._output_path, 'images'))
         if not os.path.exists(os.path.join(self._output_path, 'thumbs')):
             os.mkdir(os.path.join(self._output_path, 'thumbs'))
+        self.warmup()
 
     def spin(self):
         while True:
@@ -39,6 +40,13 @@ class ImageWriter:
 
             time.sleep(self._interval)
 
+    def warmup(self):
+        for i in range(10):
+            success, image = self._cap.read()
+            if not success:
+                log.info("Could not grab image from camera.")
+            time.sleep(1)
+
     def process(self):
         success, image = self._cap.read()
         if not success:
@@ -46,9 +54,10 @@ class ImageWriter:
             return False
 
         # Do extra processing, if any.
-        image_size = (int(image.shape[1] * self._image_scale),
-                      int(image.shape[0] * self._image_scale))
-        image = cv2.resize(image, image_size)
+        if self._image_scale != 1.0:
+            image_size = (int(image.shape[1] * self._image_scale),
+                          int(image.shape[0] * self._image_scale))
+            image = cv2.resize(image, image_size)
 
         self.write(image)
         return True
@@ -73,8 +82,15 @@ class ImageWriter:
             try:
                 remote_filename_key = os.path.join(subdir, basename)
                 log.info("Uploading to s3 ({})".format(remote_filename_key))
-                self._bucket.upload_file(output_filename, remote_filename_key)
-                os.remove(output_filename)
+                self._bucket.upload_file(output_filename, 
+                                         remote_filename_key,
+                                         ExtraArgs={
+                                             'ACL': "public-read",
+                                             'ContentType': "image/jpeg",
+                                             })
+                # Don't remove -- we may need these images elsewhere, and
+                # it's expensive to download them back from S3.
+                #os.remove(output_filename)
             except Exception as error:
                 log.error(error)
 

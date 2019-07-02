@@ -14,6 +14,102 @@ from cache import Cache
 from misc import compute_image_stats
 import config
 import utils
+import datetime
+import pytz
+
+def overlay_timestamp_on_image(img, timestamp):
+    d = datetime.datetime.fromtimestamp(timestamp, pytz.timezone('US/Eastern'))
+    text = d.strftime('%4Y %02m %02d %02H:%02M')
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    cv2.putText(img, text, (10,20), font, 0.6, (255, 255, 255), 4, cv2.LINE_AA)
+    cv2.putText(img, text, (10,20), font, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+    return img
+
+def subsample_filenames(filenames):
+    def is_bad_date(date):
+        return d.year == 2018 and d.month < 10
+    
+    output = []
+    MAX_GAP_SEC = 15*60
+    has_file_for_day = False
+    target_hour = 18
+    for f in filenames:
+        ts = float(os.path.splitext(os.path.basename(f))[0])
+        d = datetime.datetime.fromtimestamp(ts, pytz.timezone('US/Eastern'))
+        if is_bad_date(d):
+            continue
+        if has_file_for_day:
+            if d.day == d_target.day:
+                continue
+            else:
+                has_file_for_day = False
+        
+        d_target = datetime.datetime(d.year, d.month, d.day, target_hour, 0, 0, 0, pytz.timezone('US/Eastern'))
+        if (d - d_target).total_seconds() < MAX_GAP_SEC:
+            has_file_for_day = True
+            output.append(f)
+    return output
+
+    
+def make_long_timelapse_video(output_filename,
+                              fps,
+                              num_images_to_take,
+                              image_process_lambda=None):
+    filenames = sorted(utils.get_image_filenames())
+    filenames.reverse()
+    filenames = subsample_filenames(filenames)
+    filenames = filenames[0:num_images_to_take]
+    # Get filenames back into chronological orger.
+    filenames.reverse()
+
+
+    img = utils.read_remote_image(filenames[0])
+    if image_process_lambda is not None:
+        img = image_process_lambda(img)
+    fourcc_func = None
+    try:
+        fourcc_func = cv2.VideoWriter_fourcc
+    except AttributeError:
+        fourcc_func = cv2.cv.FOURCC
+    fourcc = fourcc_func('M', 'J', 'P', 'G')
+    original_img_shape = img.shape
+    video = cv2.VideoWriter(output_filename, fourcc, fps,
+                            (img.shape[1], img.shape[0]))
+
+    for idx, f in enumerate(filenames):
+        print "Processing {}/{}".format(idx, len(filenames))
+        local_filename = os.path.join(config.LOCAL_IMAGE_CACHE_DIR,
+                                      os.path.basename(f))
+        print local_filename, os.path.exists(local_filename)
+
+        if os.path.exists(local_filename):
+            print "Getting {} from cache".format(local_filename)
+            img = cv2.imread(local_filename)
+        else:
+            try:
+                print "Getting {} from s3".format(f)
+                img = utils.read_remote_image(f)
+            except Exception as e:
+                print "Caught {}".format(e)
+                continue
+            cv2.imwrite(
+                os.path.join(config.LOCAL_IMAGE_CACHE_DIR, os.path.basename(f)), img)
+        # Process image.
+        if image_process_lambda is not None:
+            img = image_process_lambda(img)
+        timestamp = float(os.path.splitext(os.path.basename(local_filename))[0])
+        img = overlay_timestamp_on_image(img, timestamp)
+        # Verify that current image dimensions match the dimensions that we
+        # created the video with -- otherwise the video will not be playable.
+        if img.shape[0] != original_img_shape[0] or img.shape[
+                1] != original_img_shape[1]:
+            print "Image shape ({}) does not match original shape {}".format(
+                img.shape, original_img_shape)
+            img = cv2.resize(img, (original_img_shape[1], original_img_shape[0]))
+            print "Resized to {}".format(img.shape)
+        video.write(img)
+
 
 
 def make_timelapse_video(output_filename,
@@ -41,29 +137,35 @@ def make_timelapse_video(output_filename,
 
     for idx, f in enumerate(filenames):
         print "Processing {}/{}".format(idx, len(filenames))
-        local_filename = os.path.join(config.LOCAL_CACHE_DIR,
+        local_filename = os.path.join(config.LOCAL_IMAGE_CACHE_DIR,
                                       os.path.basename(f))
+        print local_filename, os.path.exists(local_filename)
+
         if os.path.exists(local_filename):
             print "Getting {} from cache".format(local_filename)
             img = cv2.imread(local_filename)
         else:
             try:
+                print "Getting {} from s3".format(f)
                 img = utils.read_remote_image(f)
             except Exception as e:
                 print "Caught {}".format(e)
                 continue
             cv2.imwrite(
-                os.path.join(config.LOCAL_CACHE_DIR, os.path.basename(f)), img)
+                os.path.join(config.LOCAL_IMAGE_CACHE_DIR, os.path.basename(f)), img)
         # Process image.
         if image_process_lambda is not None:
             img = image_process_lambda(img)
+        timestamp = float(os.path.splitext(os.path.basename(local_filename))[0])
+        img = overlay_timestamp_on_image(img, timestamp)
         # Verify that current image dimensions match the dimensions that we
         # created the video with -- otherwise the video will not be playable.
         if img.shape[0] != original_img_shape[0] or img.shape[
                 1] != original_img_shape[1]:
             print "Image shape ({}) does not match original shape {}".format(
                 img.shape, original_img_shape)
-            continue
+            img = cv2.resize(img, (original_img_shape[1], original_img_shape[0]))
+            print "Resized to {}".format(img.shape)
         video.write(img)
 
 
@@ -98,6 +200,7 @@ class Renderer:
                                         config.CAPTURE_PERIOD_SEC)
         self.image_step = 1
         self.last_timelapse_rendered_timestamp = 0
+        self.already_uploaded_static_files = False
 
     def render_templates(self):
         # Render and upload templates.
@@ -120,15 +223,18 @@ class Renderer:
                     })
                 log.info("Uploading {} to S3".format(fn))
         # Upload static files.
-        if os.path.exists(os.path.join(self.output_path, 'static')):
-            shutil.rmtree(os.path.join(self.output_path, 'static'))
-        shutil.copytree('static', os.path.join(self.output_path, 'static'))
-        if self.upload_to_s3:
-            bucket = utils.get_s3_bucket()
-            for fn in os.listdir('static'):
-                fn = os.path.join('static', fn)
-                bucket.upload_file(fn, fn, ExtraArgs={'ACL': "public-read"})
-                log.info("Uploading {} to S3".format(fn))
+        if not self.already_uploaded_static_files:
+            self.already_uploaded_static_files = True
+            if os.path.exists(os.path.join(self.output_path, 'static')):
+                shutil.rmtree(os.path.join(self.output_path, 'static'))
+            shutil.copytree('static', os.path.join(self.output_path, 'static'))
+            if self.upload_to_s3:
+                bucket = utils.get_s3_bucket()
+                for fn in os.listdir('static'):
+                    fn = os.path.join('static', fn)
+                    bucket.upload_file(fn, fn, ExtraArgs={'ACL': "public-read"})
+                    log.info("Uploading {} to S3".format(fn))
+
 
     def should_render_timelapse(self):
         dt = time.time() - self.last_timelapse_rendered_timestamp
@@ -183,8 +289,9 @@ class Renderer:
                 self.thumb_cache.add(f, img_data)
 
             images.append({
-                'url_thumb': f,
-                'url': f.replace(config.THUMBS_PATH, config.IMAGES_PATH),
+                'url_thumb_dirname': os.path.dirname(f),
+                'url_image_dirname': os.path.dirname(f).replace(config.THUMBS_PATH, config.IMAGES_PATH),
+                'url_basename': os.path.basename(f), 
                 'sky_color': img_data['sky_color'],
             })
         cache_miss_frac = num_cache_misses / float(len(filenames))

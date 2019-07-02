@@ -16,12 +16,23 @@ window.dataLayer = window.dataLayer || [];
 $(function() { OnPageLoad(); });
 
 function OnPageLoad() {
+  GenerateGrid();
+
   $(document).keydown(function(event) {
+    maybe_handle_volume(event);
     handle_modal_control(event);
   });
   $(document).mousedown(function(event) {
     handle_modal_control(event);
   });
+  var audio = document.getElementById("newyorksky-audio");
+  audio.volume = 0.1;
+  audio.removeAttribute('controls');
+  promise = audio.play();
+  if (promise !== undefined) {
+    promise.then(_ => {}).catch(error => {console.log("autoplay prevented!")});
+  }
+
 }
 </script>
 <meta name="keywords" content="New York City, New York Sky, NYC, New York Skyline">
@@ -33,7 +44,41 @@ function OnPageLoad() {
 
 <%include file="navbar.html" args="current='home'"/>
 
+<audio controls autoplay loop id="newyorksky-audio">
+<source src="http://s3.amazonaws.com/newyorksky.live/audio/latest.mp3" type="audio/mp3">
+</audio>
+
+
 <script>
+function try_increase_volume() {                                                
+  var audio = document.getElementById("newyorksky-audio");                      
+  var promise = audio.play();                                                   
+  if (promise !== undefined) {                                                  
+    promise.then(_ => {}).catch(error => {console.log("autoplay prevented!")}); 
+  }                                                                             
+  audio.volume = Math.min(1.0, audio.volume + 0.1);                             
+}
+
+function try_decrease_volume() {                                                
+  var audio = document.getElementById("newyorksky-audio");                      
+  var promise = audio.play();                                                   
+  if (promise !== undefined) {                                                  
+    promise.then(_ => {}).catch(error => {console.log("autoplay prevented!")}); 
+  }                                                                             
+  audio.volume = Math.max(0.0, audio.volume - 0.1);                             
+}
+
+function maybe_handle_volume(event) {
+  if (event.type != "keydown") {
+    return;
+  }
+  if (event.key == "[") {
+    try_decrease_volume();
+  } else if (event.key == "]") {
+    try_increase_volume();
+  }
+}
+
 
 function handle_modal_control(event) {
   if (!modal_shown) {
@@ -64,24 +109,15 @@ function close_modal() {
 }
 
 
-function date_from_filename(url) {
-  timestamp = Number(url.replace(/^.*[\\\/]/, '').replace('.jpg', ''))
-  return new Date(timestamp*1000);
-}
-
-function pretty_print_date(d) {
-  return d.toISOString('en-US', { timeZone: 'America/New_York' }).slice(0,10) + " " + d.toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
-}
-
 function display_thumb(image_index) {
-  thumb_url = thumb_urls[image_index];
+  thumb_url = thumb_url_base + "/" + image_urls[image_index];
   $('#imgcell'+image_index).attr("src", thumb_url);
 }
 
 function display_modal(image_index) {
   modal_shown = true;
   current_image_index = image_index;
-  image_url = image_urls[image_index];
+  image_url = image_url_base + "/" + image_urls[image_index];
   var image_date = date_from_filename(image_url);
   // Get the modal
   var modal = $('#modal')[0];
@@ -94,21 +130,38 @@ function display_modal(image_index) {
 var current_image_index = 0;
 var modal_shown = false;
 
+function GenerateGrid() {
+  for (var i = 0; i < image_colors.length; ++i) {
+    rgba = "rgba({0},{1},{2},10.0)".format(image_colors[i][0],image_colors[i][1],image_colors[i][2]);
+    div = document.createElement("div");
+    div.setAttribute("class", "cell");
+    div.setAttribute("style", "background: " + rgba);
+    div.setAttribute("onmouseover", "display_thumb({0})".format(i));
+    
+    img = document.createElement("img");
+    img.setAttribute("src", "static/dummy.jpg");
+    img.setAttribute("class", "responsive-image");
+    img.setAttribute("onclick", "display_modal({0})".format(i));
+    img.setAttribute("id", "imgcell{0}".format(i));
+
+    div.appendChild(img);
+    document.getElementById("grid").appendChild(div);
+  }
+}
+
 </script>
 <script>
+
 image_colors = [
 % for image in images:
-[${image['sky_color'][0]}, ${image['sky_color'][1]}, ${image['sky_color'][2]}],
+[${image['sky_color'][0]},${image['sky_color'][1]},${image['sky_color'][2]}],
 % endfor
 ]
+image_url_base = "${images[0]['url_image_dirname']}"
+thumb_url_base = "${images[0]['url_thumb_dirname']}"
 image_urls = [
 % for image in images:
-"${image['url']}",
-% endfor
-]
-thumb_urls = [
-% for image in images:
-"${image['url_thumb']}",
+"${image['url_basename']}",
 % endfor
 ]
 </script>
@@ -119,14 +172,7 @@ thumb_urls = [
   <div class="modal-caption" id="modalcaption"></div>
 </div>
 
-<div class="grid">
-  % for index, image in enumerate(images):
-  <div class="cell" style="background: rgba(${image['sky_color'][0]}, ${image['sky_color'][1]}, ${image['sky_color'][2]}, 10.0);" onmouseover="display_thumb(${index});">
-    <img id="imgcell${index}" src="static/dummy.jpg" class="responsive-image" onclick="display_modal(${index});">
-  </div>
-  % endfor
-  
-</div>
+<div id="grid" class="grid"></div>
 
 <%include file="footer.html" args="update_date=update_date"/>
 
